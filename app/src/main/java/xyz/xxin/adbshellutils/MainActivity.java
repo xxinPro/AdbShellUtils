@@ -6,12 +6,17 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+
+import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import rikka.shizuku.Shizuku;
 
@@ -125,27 +130,61 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            String shellCommand = input_command.getText().toString();
+            String command = input_command.getText().toString().trim();
 
-            if ("".equals(shellCommand.trim().replaceAll(" ", ""))) {
+            // 命令不能为空
+            if (TextUtils.isEmpty(command)) {
                 Toast.makeText(this, "命令不能为空", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // 将执行结果显示
             try {
-                String result = iUserService.exec(shellCommand);
+                // 执行命令，返回执行结果
+                String result = exec(command);
 
-                if ("".equals(result.replaceAll(" ", ""))) {
-                    result = "null";
+                if (result == null) {
+                    result = "返回结果为null";
+                } else if (TextUtils.isEmpty(result.trim())) {
+                    result = "返回结果为空";
                 }
 
+                // 将执行结果显示
                 execute_result.setText(result);
-            } catch (RemoteException e) {
+            } catch (Exception e) {
                 execute_result.setText(e.toString());
                 e.printStackTrace();
             }
         });
+    }
+
+    private String exec(String command) throws RemoteException {
+        // 检查是否存在包含任意内容的双引号
+        Pattern pattern = Pattern.compile("\"([^\"]*)\"");
+        Matcher matcher = pattern.matcher(command);
+
+        // 下面展示了两种不同的命令执行方法
+        if (matcher.find()) {
+            ArrayList<String> list = new ArrayList<>();
+            Pattern pattern2 = Pattern.compile("\"([^\"]*)\"|(\\S+)");
+            Matcher matcher2 = pattern2.matcher(command);
+
+            while (matcher2.find()) {
+                if (matcher2.group(1) != null) {
+                    // 如果是引号包裹的内容，取group(1)
+                    list.add(matcher2.group(1));
+                } else {
+                    // 否则取group(2)，即普通的单词
+                    list.add(matcher2.group(2));
+                }
+            }
+
+            // 这种方法可用于执行路径中带空格的命令，例如 ls /storage/0/emulated/temp dir/
+            // 当然也可以执行不带空格的命令，实际上是要强于另一种执行方式的
+            return iUserService.execArr(list.toArray(new String[0]));
+        } else {
+            // 这种方法仅用于执行路径中不包含空格的命令，例如 ls /storage/0/emulated/
+            return iUserService.execLine(command);
+        }
     }
 
     private final ServiceConnection serviceConnection = new ServiceConnection() {

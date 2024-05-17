@@ -15,7 +15,12 @@ interface IUserService {
     /**
      * 执行命令
      */
-    String exec(String command) = 2;
+    String execLine(String command) = 2;
+
+    /**
+     * 执行数组中分离的命令
+     */
+    String execArr(in String[] command) = 3;
 }
 
 
